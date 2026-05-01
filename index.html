@@ -223,10 +223,11 @@
     };
 
     const DEFAULT_TAGS = [
-      { id: 1, name: 'ハロウィン',       group: 'BeatPhobia' },
+      { id: 1, name: 'コナンハロウィン', group: 'BeatPhobia' },
       { id: 2, name: 'コナン絡繰',       group: 'BeatPhobia' },
       { id: 3, name: 'コナンハイウェイ', group: 'BeatPhobia' },
-      { id: 4, name: 'その他',           group: 'BeatPhobia' },
+      { id: 4, name: 'ハンター',         group: 'BeatPhobia' },
+      { id: 9, name: 'その他',           group: 'BeatPhobia' },
       { id: 5, name: 'アイテムだらけ',   group: 'DIAEGG'     },
       { id: 6, name: 'MMB',              group: 'DIAEGG'     },
       { id: 7, name: '沈黙',             group: 'DIAEGG'     },
@@ -601,6 +602,34 @@
           photosRef.off();
         };
       }, [user]);
+
+      // ─── タグマイグレーション（初回ロード後に一度だけ実行） ────────
+      useEffect(() => {
+        if (!dataReady || !user) return;
+        let updated = [...tags];
+        let changed = false;
+
+        // 「ハロウィン」→「コナンハロウィン」にリネーム
+        updated = updated.map(t => {
+          if (t.name === 'ハロウィン' && t.group === 'BeatPhobia') {
+            changed = true;
+            return { ...t, name: 'コナンハロウィン', color: getColorFromName('BeatPhobiaコナンハロウィン') };
+          }
+          return t;
+        });
+
+        // 「ハンター」がなければ「その他」の前に追加
+        const hasHunter = updated.some(t => t.name === 'ハンター' && t.group === 'BeatPhobia');
+        if (!hasHunter) {
+          const sonoTaIdx = updated.findIndex(t => t.name === 'その他' && t.group === 'BeatPhobia');
+          const newTag = { id: Date.now(), name: 'ハンター', group: 'BeatPhobia', color: getColorFromName('BeatPhobiaハンター') };
+          if (sonoTaIdx >= 0) updated.splice(sonoTaIdx, 0, newTag);
+          else updated.push(newTag);
+          changed = true;
+        }
+
+        if (changed) writeTags(updated);
+      }, [dataReady]); // eslint-disable-line
 
       // ─── Firebase書き込みヘルパー ─────────────────────────────────
       const writeTags = (newTags) => {
