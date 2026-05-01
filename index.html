@@ -180,6 +180,27 @@
 
     const TAGS_VERSION = 'v5-kr';
 
+    // ─── 担当者 ────────────────────────────────────────────────────
+    const ASSIGNEES = [
+      { id: 'kuriyama', initial: '栗', color: '#6366F1' },
+      { id: 'yushi',    initial: 'Y',  color: '#10B981' },
+    ];
+    const getAssignee = (id) => ASSIGNEES.find(a => a.id === id) || null;
+
+    const AssigneeAvatar = ({ assigneeId, size = 18 }) => {
+      const a = getAssignee(assigneeId);
+      if (!a) return null;
+      return (
+        <span style={{
+          display:'inline-flex', alignItems:'center', justifyContent:'center',
+          width:size, height:size, borderRadius:'50%',
+          background: a.color, color:'white',
+          fontSize: size * 0.55, fontWeight:700, flexShrink:0,
+          lineHeight:1,
+        }}>{a.initial}</span>
+      );
+    };
+
     const GROUPS = ['BeatPhobia', 'DIAEGG'];
     const GROUP_COLORS = { 'BeatPhobia': '#8B5CF6', 'DIAEGG': '#10B981' };
     const GROUP_LABELS = { 'BeatPhobia': 'BP', 'DIAEGG': 'DE' };
@@ -303,6 +324,7 @@
           <span className="task-text" style={{fontSize:13, color:'#374151', lineHeight:1.5, flex:1}}>
             {task.text}
           </span>
+          <AssigneeAvatar assigneeId={task.assigneeId} size={18} />
           <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2, flexShrink:0}}>
             <DueBadge dueStr={task.dueStr} done={task.done} />
             {showDate && (
@@ -385,7 +407,7 @@
               {pending.map(task => (
                 <TaskRow key={task.id} task={task} showDate
                   onToggle={toggleDone}
-                  onEdit={(t) => setEditingTask({...t, editText:t.text, editTagId:t.tagId, editDueStr:t.dueStr||''})}
+                  onEdit={(t) => setEditingTask({...t, editText:t.text, editTagId:t.tagId, editDueStr:t.dueStr||'', editAssigneeId:t.assigneeId||null})}
                   onDragStart={() => { draggingTaskId.current = task.id; }}
                   onDragEnd={() => { draggingTaskId.current = null; setDragOverTagId(null); }}
                 />
@@ -396,7 +418,7 @@
                   {doneToday.map(task => (
                     <TaskRow key={task.id} task={task} showDate
                       onToggle={toggleDone}
-                      onEdit={(t) => setEditingTask({...t, editText:t.text, editTagId:t.tagId, editDueStr:t.dueStr||''})}
+                      onEdit={(t) => setEditingTask({...t, editText:t.text, editTagId:t.tagId, editDueStr:t.dueStr||'', editAssigneeId:t.assigneeId||null})}
                       onDragStart={() => { draggingTaskId.current = task.id; }}
                       onDragEnd={() => { draggingTaskId.current = null; setDragOverTagId(null); }}
                     />
@@ -485,6 +507,7 @@
       const [inputText, setInputText]         = useState('');
       const [inputDueStr, setInputDueStr]     = useState('');
       const [selectedTagId, setSelectedTagId] = useState(null);
+      const [selectedAssigneeId, setSelectedAssigneeId] = useState(null);
       const [newTagName, setNewTagName]       = useState('');
       const [newTagGroup, setNewTagGroup]     = useState('BeatPhobia');
       const [showTagInput, setShowTagInput]   = useState(false);
@@ -583,6 +606,7 @@
           id: Date.now(), text: inputText.trim(),
           tagId: selectedTagId, dateStr: toDateStr(today), done: false,
           dueStr: inputDueStr || null,
+          assigneeId: selectedAssigneeId || null,
         }]);
         setInputText('');
         showPopup('がんば〜💪', '#6366F1');
@@ -636,6 +660,7 @@
         writeTasks(prev => prev.map(t => t.id === editingTask.id ? {
           ...t, text: editingTask.editText, tagId: editingTask.editTagId,
           dueStr: editingTask.editDueStr || null,
+          assigneeId: editingTask.editAssigneeId || null,
         } : t));
         setEditingTask(null);
       };
@@ -730,7 +755,7 @@
                               outline: isOverdue && !task.done ? '1.5px solid #DC2626' : 'none',
                             }}
                             onClick={() => toggleDone(task.id)}
-                            onContextMenu={(e) => { e.preventDefault(); setEditingTask({...task, editText:task.text, editTagId:task.tagId, editDueStr:task.dueStr||''}); }}
+                            onContextMenu={(e) => { e.preventDefault(); setEditingTask({...task, editText:task.text, editTagId:task.tagId, editDueStr:task.dueStr||'', editAssigneeId:task.assigneeId||null}); }}
                             title={`ドラッグで移動 / 右クリックで編集${task.dueStr ? ' / 期日: ' + task.dueStr : ''}`}
                           >
                             <div>{task.text}</div>
@@ -872,6 +897,30 @@
                   </div>
                 </div>
 
+                <div style={{marginBottom:14}}>
+                  <label style={{fontSize:12,fontWeight:600,color:'#6B7280',display:'block',marginBottom:8}}>担当者</label>
+                  <div style={{display:'flex', gap:8}}>
+                    <button onClick={() => setEditingTask({...editingTask, editAssigneeId: null})}
+                      style={{
+                        width:32, height:32, borderRadius:'50%', border:'1.5px solid #E5E7EB',
+                        cursor:'pointer', fontSize:11, fontWeight:600,
+                        background: !editingTask.editAssigneeId ? '#374151' : 'white',
+                        color: !editingTask.editAssigneeId ? 'white' : '#9CA3AF',
+                      }}>－</button>
+                    {ASSIGNEES.map(a => (
+                      <button key={a.id} onClick={() => setEditingTask({...editingTask, editAssigneeId: a.id})}
+                        style={{
+                          width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer',
+                          background: editingTask.editAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`,
+                          color: editingTask.editAssigneeId === a.id ? 'white' : a.color,
+                          fontSize:13, fontWeight:700,
+                          boxShadow: editingTask.editAssigneeId === a.id ? `0 0 0 2px white, 0 0 0 4px ${a.color}` : 'none',
+                          transition:'all 0.15s',
+                        }}>{a.initial}</button>
+                    ))}
+                  </div>
+                </div>
+
                 <div style={{marginBottom:20}}>
                   <label style={{fontSize:12,fontWeight:600,color:'#6B7280',display:'block',marginBottom:8}}>タグ</label>
                   <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -958,6 +1007,21 @@
                     cursor:'pointer', outline:'none', width:130,
                   }}
                 />
+              </div>
+              {/* 担当者選択 */}
+              <div style={{display:'flex', gap:4, flexShrink:0}}>
+                {ASSIGNEES.map(a => (
+                  <button key={a.id} onClick={() => setSelectedAssigneeId(selectedAssigneeId === a.id ? null : a.id)}
+                    title={a.id}
+                    style={{
+                      width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer',
+                      background: selectedAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`,
+                      color: selectedAssigneeId === a.id ? 'white' : a.color,
+                      fontSize:13, fontWeight:700,
+                      boxShadow: selectedAssigneeId === a.id ? `0 0 0 2px white, 0 0 0 4px ${a.color}` : 'none',
+                      transition:'all 0.15s',
+                    }}>{a.initial}</button>
+                ))}
               </div>
               <button onClick={addTask} disabled={!inputText.trim()} className="btn-primary">
                 🚀 これやるよ
