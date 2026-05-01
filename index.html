@@ -185,18 +185,32 @@
       { id: 'kuriyama', initial: '栗', color: '#6366F1' },
       { id: 'yushi',    initial: 'Y',  color: '#10B981' },
     ];
+    // メールアドレス → assigneeId マッピング
+    const EMAIL_TO_ASSIGNEE = {
+      'si2molo@gmail.com':           'kuriyama',
+      'kuriyama@scrapmagazine.com':  'kuriyama',
+      'yushi@scrapmagazine.com':     'yushi',
+    };
     const getAssignee = (id) => ASSIGNEES.find(a => a.id === id) || null;
 
-    const AssigneeAvatar = ({ assigneeId, size = 18 }) => {
+    const AssigneeAvatar = ({ assigneeId, size = 18, photos = {} }) => {
       const a = getAssignee(assigneeId);
       if (!a) return null;
+      const photoURL = photos[a.id];
+      if (photoURL) {
+        return (
+          <img src={photoURL} alt={a.id}
+            style={{ width:size, height:size, borderRadius:'50%', flexShrink:0, objectFit:'cover',
+              boxShadow:`0 0 0 2px ${a.color}` }}
+          />
+        );
+      }
       return (
         <span style={{
           display:'inline-flex', alignItems:'center', justifyContent:'center',
           width:size, height:size, borderRadius:'50%',
           background: a.color, color:'white',
-          fontSize: size * 0.55, fontWeight:700, flexShrink:0,
-          lineHeight:1,
+          fontSize: size * 0.55, fontWeight:700, flexShrink:0, lineHeight:1,
         }}>{a.initial}</span>
       );
     };
@@ -324,7 +338,7 @@
           <span className="task-text" style={{fontSize:13, color:'#374151', lineHeight:1.5, flex:1}}>
             {task.text}
           </span>
-          <AssigneeAvatar assigneeId={task.assigneeId} size={18} />
+          <AssigneeAvatar assigneeId={task.assigneeId} size={18} photos={photos} />
           <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2, flexShrink:0}}>
             <DueBadge dueStr={task.dueStr} done={task.done} />
             {showDate && (
@@ -501,6 +515,7 @@
       // ─ Data state ─
       const [tags, setTags]   = useState(DEFAULT_TAGS);
       const [tasks, setTasks] = useState([]);
+      const [photos, setPhotos] = useState({}); // { kuriyama: 'https://...', yushi: 'https://...' }
       const [dataReady, setDataReady] = useState(false);
 
       // ─ UI state ─
@@ -545,6 +560,15 @@
         setTasks([]);
       };
 
+      // ─── ログイン時：自分の写真をFirebaseに保存 ──────────────────
+      useEffect(() => {
+        if (!user || !ALLOWED_EMAILS.includes(user.email)) return;
+        const assigneeId = EMAIL_TO_ASSIGNEE[user.email];
+        if (assigneeId && user.photoURL) {
+          db.ref(`shared/photos/${assigneeId}`).set(user.photoURL);
+        }
+      }, [user]);
+
       // ─── Firebaseリアルタイム同期 ─────────────────────────────────
       useEffect(() => {
         if (!user || !ALLOWED_EMAILS.includes(user.email)) return;
@@ -565,9 +589,17 @@
           setDataReady(true);
         });
 
+        // 写真同期
+        const photosRef = db.ref('shared/photos');
+        photosRef.on('value', (snap) => {
+          const val = snap.val();
+          if (val) setPhotos(val);
+        });
+
         return () => {
           REF.tags.off();
           REF.tasks.off();
+          photosRef.off();
         };
       }, [user]);
 
@@ -910,13 +942,17 @@
                     {ASSIGNEES.map(a => (
                       <button key={a.id} onClick={() => setEditingTask({...editingTask, editAssigneeId: a.id})}
                         style={{
-                          width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer',
-                          background: editingTask.editAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`,
+                          width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer', padding:0,
+                          background: photos[a.id] ? 'transparent' : (editingTask.editAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`),
                           color: editingTask.editAssigneeId === a.id ? 'white' : a.color,
-                          fontSize:13, fontWeight:700,
+                          fontSize:13, fontWeight:700, overflow:'hidden',
                           boxShadow: editingTask.editAssigneeId === a.id ? `0 0 0 2px white, 0 0 0 4px ${a.color}` : 'none',
                           transition:'all 0.15s',
-                        }}>{a.initial}</button>
+                        }}>
+                        {photos[a.id]
+                          ? <img src={photos[a.id]} alt={a.id} style={{width:32,height:32,objectFit:'cover',display:'block'}} />
+                          : a.initial}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1014,13 +1050,17 @@
                   <button key={a.id} onClick={() => setSelectedAssigneeId(selectedAssigneeId === a.id ? null : a.id)}
                     title={a.id}
                     style={{
-                      width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer',
-                      background: selectedAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`,
+                      width:32, height:32, borderRadius:'50%', border:'none', cursor:'pointer', padding:0,
+                      background: photos[a.id] ? 'transparent' : (selectedAssigneeId === a.id ? a.color : `rgba(${hexToRgb(a.color)},0.15)`),
                       color: selectedAssigneeId === a.id ? 'white' : a.color,
-                      fontSize:13, fontWeight:700,
+                      fontSize:13, fontWeight:700, overflow:'hidden',
                       boxShadow: selectedAssigneeId === a.id ? `0 0 0 2px white, 0 0 0 4px ${a.color}` : 'none',
-                      transition:'all 0.15s',
-                    }}>{a.initial}</button>
+                      transition:'all 0.15s', flexShrink:0,
+                    }}>
+                    {photos[a.id]
+                      ? <img src={photos[a.id]} alt={a.id} style={{width:32,height:32,objectFit:'cover',display:'block'}} />
+                      : a.initial}
+                  </button>
                 ))}
               </div>
               <button onClick={addTask} disabled={!inputText.trim()} className="btn-primary">
